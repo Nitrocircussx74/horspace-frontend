@@ -133,7 +133,10 @@ api.interceptors.response.use(
     }
 
     const url = originalRequest.url || '';
-    const isLiffRoute = url.includes('/api/v1/liff') || url.includes('/api/liff');
+    // หน้า LIFF (เช่น owner-dashboard) เรียก Endpoint ฝั่ง CMS ที่ path ไม่มีคำว่า liff (/invoices, /buildings ฯลฯ)
+    // ถ้าดูแค่ URL จะหลุดไปสาขา CMS แล้วเด้งไปหน้า /login ของ CMS — จึงนับว่าเป็น LIFF เมื่ออยู่ในหน้า /liff ด้วย
+    const isLiffPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/liff');
+    const isLiffRoute = isLiffPage || url.includes('/api/v1/liff') || url.includes('/api/liff');
     const isAuthEndpoint = url.includes('/auth/') || url.includes('/invites/verify') || url.includes('/silent-login');
     const isCmsAuthRoute = url.includes('/auth/login') || url.includes('/auth/refresh');
 
@@ -147,6 +150,8 @@ api.interceptors.response.use(
       const authStore = useAuthStore();
       authStore.clearLiffAuth();
       localStorage.removeItem('dev_line_user_id');
+      // ปลดตัวกัน Auto-login 1 ครั้ง/Session ไม่งั้นการหมดอายุครั้งที่สองใน Session เดิมจะไม่ได้ login ใหม่ (Guard ตั้ง Flag ใหม่เองกัน Loop)
+      sessionStorage.removeItem('liff_auto_login_attempted');
       if (typeof window !== 'undefined' && window.location.pathname !== '/liff') {
         window.location.href = `/liff?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
       }
