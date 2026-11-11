@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { initLiff, isInLiffClient, isLiffLoggedIn, loginLiff } from '@/utils/liff';
+import { initLiff, isLiffLoggedIn, loginLiff } from '@/utils/liff';
 
 const routes = [
   {
@@ -333,6 +333,11 @@ const routes = [
     ]
   },
 
+  // path ที่ไม่มีอยู่ใต้ /liff (เช่น /liff/liff) กลับหน้าแรกของ LIFF ไม่ใช่ตกไป catch-all ด้านล่างซึ่งไปหน้า CMS login
+  {
+    path: '/liff/:pathMatch(.*)*',
+    redirect: '/liff'
+  },
   {
     path: '/:pathMatch(.*)*',
     redirect: '/'
@@ -381,18 +386,11 @@ async function cmsNavigationGuard(to, from, next) {
 async function liffNavigationGuard(to, from, next) {
   const authStore = useAuthStore();
 
-  // 📱 0. หากเปิดผ่าน Browser ธรรมดา (ไม่ใช่ LINE App จริง) ให้เด้งไปเปิดผ่าน LINE แทนทันที
-  // กัน User สับสน/ติดปัญหา LINE ID Token verify ไม่ได้แบบที่เจอกันมา (LIFF ต้องพึ่ง Session จริงของ LINE
-  // เสมอ Browser ธรรมดาไม่มีทางได้ Token จริง) — ข้ามใน Dev Mode ไว้ให้ยังทดสอบผ่าน Browser ด้วย ?devLineUserId= ได้ตามปกติ
+  // 📱 0. Init LIFF SDK ก่อนเสมอ (isLiffLoggedIn() ด้านล่างต้องการให้ init แล้ว) — เปิดผ่าน Browser ธรรมดาได้ด้วย
+  // เดิมบังคับเด้งไป liff.line.me/<id><to.fullPath> ซึ่งทำให้ path ซ้อน (/liff/liff → ตกไป CMS login) และวนไม่จบ
+  // LIFF รองรับ External Browser: ไม่มี Session จะไป LINE Login ผ่านขั้น 0.5 ด้านล่าง แล้วได้ ID Token จริงกลับมา
   if (!import.meta.env.DEV && typeof window !== 'undefined') {
     await initLiff();
-    if (!isInLiffClient()) {
-      const liffId = import.meta.env.VITE_LINE_LIFF_ID || import.meta.env.VITE_LIFF_ID || '';
-      if (liffId) {
-        window.location.href = `https://liff.line.me/${liffId}${to.fullPath}`;
-        return; // กำลังจะออกจากหน้านี้อยู่แล้ว ไม่ต้อง next() ต่อ
-      }
-    }
   }
 
   // 🔑 0.5 Auto-login ผ่าน LINE ให้ทุกหน้าที่มาผ่าน LIFF โดยไม่ต้องรอแต่ละหน้าเขียนเช็คเอง (ก่อนหน้านี้มีแค่
