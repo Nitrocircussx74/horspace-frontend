@@ -326,7 +326,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { initLiff, isLiffLoggedIn, loginLiff, getLiffProfile, getLiffIdToken, getLiffFriendship, openAddFriendLine } from '@/utils/liff';
-import api from '@/utils/api';
+import api, { isLineTokenInvalid } from '@/utils/api';
 import authService from '@/services/authService';
 import { useAuthStore } from '@/stores/auth';
 import { useDynamicTheme } from '@/composables/useDynamicTheme';
@@ -406,6 +406,11 @@ const continueToSmartEntry = async () => {
         statusRes = await authService.checkLiffStatus(idToken);
       } catch (e) {
         console.warn('Check status fallback:', e.message);
+        // ID Token เสีย: interceptor กำลัง login LINE ใหม่ (หน้าโหลดใหม่) ห้ามแสดงฟอร์มสมัครลูกบ้านใหม่ให้คนที่มีบัญชีอยู่แล้ว
+        if (isLineTokenInvalid(e) && e.liffRecovering) {
+          statusText.value = 'กำลังเข้าสู่ระบบ LINE ใหม่อีกครั้ง...';
+          return;
+        }
       }
     }
 

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getLiffIdToken, initLiff, isLiffLoggedIn, loginLiff } from './liff';
+import { getLiffIdToken, initLiff, isLiffLoggedIn, loginLiff, logoutLiff } from './liff';
 import { useAuthStore } from '@/stores/auth';
 import router from '@/router';
 
@@ -120,19 +120,39 @@ api.interceptors.request.use(
 );
 
 // API บอกว่า LINE ID Token เสียด้วย 2 code (tenantAuthService ใช้ LINE_TOKEN_INVALID, liffAuthMiddleware ใช้ TOKEN_INVALID)
+// ไม่รวม UNAUTHORIZED/LINE_LOGIN_REQUIRED ("ไม่ได้ส่ง token มา") เพราะอาจเกิดจาก request ที่ยิงก่อน LIFF init เสร็จ
+// ซึ่ง silent re-auth ด้านล่างกู้ได้เองโดยไม่ต้อง login ใหม่
 const LINE_TOKEN_INVALID_CODES = ['LINE_TOKEN_INVALID', 'TOKEN_INVALID'];
-const isLineTokenInvalid = (err) => LINE_TOKEN_INVALID_CODES.includes(err?.response?.data?.code);
+// silent-login หา LINE ID Token ไม่เจอเลย (ต้อง login LINE ใหม่เหมือนกัน) — error นี้ไม่ได้มาจาก response จึงใส่ code เอง
+const LINE_TOKEN_MISSING = 'LINE_TOKEN_MISSING';
+const RECOVER_COOLDOWN_MS = 60 * 1000;
 
-// กู้คืนเมื่อ LINE ID Token เสีย: ล้าง session แล้วพากลับ /liff เพื่อ login LINE ใหม่ (ใช้ร่วมกันทั้งตอน API ปฏิเสธ
-// token และตอน silent-login เองล้มเหลวด้วยสาเหตุนี้) ถ้าอยู่ /liff อยู่แล้วไม่ redirect ซ้ำ กัน Loop
-const recoverFromInvalidLineToken = () => {
+export const isLineTokenInvalid = (err) =>
+  LINE_TOKEN_INVALID_CODES.includes(err?.response?.data?.code) || err?.code === LINE_TOKEN_MISSING;
+
+// กู้คืนเมื่อ LINE ID Token เสีย: ล้าง session + token ที่ LIFF SDK เก็บไว้ (ไม่งั้น liff.isLoggedIn() ยังเป็น true ด้วย
+// ID Token เก่า แล้ว guard ข้าม auto-login) แล้วพากลับ /liff เพื่อ login LINE ใหม่ ใช้ร่วมกันทุกจุดที่เจอสาเหตุนี้
+// คืน true ถ้าเริ่มกู้คืนแล้ว (หน้ากำลังโหลดใหม่) / false ถ้าถูกกันไว้เพราะเพิ่งกู้คืนไปไม่ถึง 1 นาที (กัน Loop เช่น channel
+// ไม่ตรงที่ login ใหม่แล้วก็ยังเสีย — ปล่อยให้ผู้เรียกแสดง error ปกติ)
+export const recoverFromInvalidLineToken = () => {
   useAuthStore().clearLiffAuth();
   localStorage.removeItem('dev_line_user_id');
   // ปลดตัวกัน Auto-login 1 ครั้ง/Session ไม่งั้นการหมดอายุครั้งที่สองใน Session เดิมจะไม่ได้ login ใหม่ (Guard ตั้ง Flag ใหม่เองกัน Loop)
   sessionStorage.removeItem('liff_auto_login_attempted');
-  if (typeof window !== 'undefined' && window.location.pathname !== '/liff') {
-    window.location.href = `/liff?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+  logoutLiff();
+  if (typeof window === 'undefined') return false;
+
+  const lastAt = Number(sessionStorage.getItem('liff_token_recovered_at') || 0);
+  if (Date.now() - lastAt < RECOVER_COOLDOWN_MS) return false;
+  sessionStorage.setItem('liff_token_recovered_at', String(Date.now()));
+
+  const { pathname, search } = window.location;
+  if (pathname === '/liff') {
+    window.location.reload();
+  } else {
+    window.location.href = `/liff?redirect=${encodeURIComponent(pathname + search)}`;
   }
+  return true;
 };
 
 // ==========================================
@@ -163,7 +183,7 @@ api.interceptors.response.use(
     // Singleton ใน liff.js จะไม่ re-init ให้) เช็คก่อน isAuthEndpoint เพราะ Endpoint ที่คืน Code นี้
     // (pin-login, link-and-login, check-status, silent-login) ล้วนมี /auth/ อยู่ในพาธที่จะโดน Skip ไป
     if (isLiffRoute && isLineTokenInvalid(error)) {
-      recoverFromInvalidLineToken();
+      error.liffRecovering = recoverFromInvalidLineToken(); // ให้ view รู้ว่าอย่าเพิ่งแสดงฟอร์ม (หน้ากำลังโหลดใหม่)
       return Promise.reject(error);
     }
 
@@ -204,7 +224,7 @@ api.interceptors.response.use(
         const idToken = getLiffIdToken();
 
         if (!idToken) {
-          throw new Error('ไม่พบ LINE ID Token สำหรับต่ออายุเซสชัน');
+          throw Object.assign(new Error('ไม่พบ LINE ID Token สำหรับต่ออายุเซสชัน'), { code: LINE_TOKEN_MISSING });
         }
 
         // ยิง Silent Re-Auth API ขอ JWT ตัวใหม่จาก LINE ID Token

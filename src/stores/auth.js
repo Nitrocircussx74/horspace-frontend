@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import authService from '@/services/authService';
 import { initLiff, isLiffLoggedIn, getLiffIdToken } from '@/utils/liff';
+import { isLineTokenInvalid, recoverFromInvalidLineToken } from '@/utils/api';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -157,6 +158,8 @@ export const useAuthStore = defineStore('auth', {
         return false;
       } catch (err) {
         console.warn('restoreLiffSession failed:', err?.message || err);
+        // silent-login ถูกเรียกด้วย axios ตรงๆ (ไม่ผ่าน interceptor) ถ้า ID Token เสียต้องกู้คืนเอง ไม่งั้นจะค้างด้วย token เก่า
+        if (isLineTokenInvalid(err)) recoverFromInvalidLineToken();
         return false;
       }
     },
