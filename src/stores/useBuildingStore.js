@@ -4,7 +4,10 @@ import api from '@/utils/api';
 export const useBuildingStore = defineStore('building', {
   state: () => ({
     buildings: [],
-    activeBuildingId: localStorage.getItem('activeBuildingId') || '',
+    // ใช้ค่าจาก localStorage เฉพาะที่เป็น UUID จริง — ค่าขยะ (เช่น ข้อความภาษาไทย) ทำให้ GET /rooms?buildingId=... พังด้วย P2023
+    activeBuildingId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(localStorage.getItem('activeBuildingId') || '')
+      ? localStorage.getItem('activeBuildingId')
+      : '',
     isLoading: false,
     error: null
   }),
