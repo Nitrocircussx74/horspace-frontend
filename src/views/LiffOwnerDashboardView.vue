@@ -409,7 +409,7 @@
               รายการสลิปรอตรวจสอบ ({{ pendingSlipsList.length }})
             </h3>
           </div>
-          <button @click="closeSlipModal" class="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer">
+          <button @click="closeSlipModal" class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer">
             <X class="w-4 h-4" />
           </button>
         </div>
@@ -503,7 +503,7 @@
               งานแจ้งซ่อมรอดำเนินการ ({{ pendingMaintenanceList.length }})
             </h3>
           </div>
-          <button @click="closeMaintenanceModal" class="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer">
+          <button @click="closeMaintenanceModal" class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer">
             <X class="w-4 h-4" />
           </button>
         </div>
@@ -588,7 +588,7 @@
               สัญญาเช่าใกล้หมดอายุใน 30 วัน ({{ expiringLeasesList.length }})
             </h3>
           </div>
-          <button @click="closeLeasesModal" class="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer">
+          <button @click="closeLeasesModal" class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer">
             <X class="w-4 h-4" />
           </button>
         </div>
@@ -659,7 +659,7 @@
 
           <button
             @click.stop="previewImageUrl = ''"
-            class="p-2 rounded-full bg-white/15 hover:bg-white/25 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer"
+            class="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer"
             title="ปิด"
           >
             <X class="w-4 h-4" />
