@@ -455,6 +455,11 @@ async function liffNavigationGuard(to, from, next) {
   if (to.path === '/liff' || to.path === '/liff/') {
     const hasSession = authStore.liffToken || (await authStore.restoreLiffSession());
     if (hasSession) {
+      // กลับหน้าเดิมที่เด้งมาจาก 401 (/liff?redirect=...) เฉพาะ Path ภายใน /liff กัน Open Redirect
+      const redirect = to.query.redirect;
+      if (typeof redirect === 'string' && redirect.startsWith('/liff/')) {
+        return next(redirect);
+      }
       if (authStore.isOwner && authStore.currentRole === 'owner') {
         return next({ path: '/liff/owner-dashboard', query: to.query });
       }

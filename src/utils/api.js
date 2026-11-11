@@ -150,6 +150,8 @@ api.interceptors.response.use(
       const authStore = useAuthStore();
       authStore.clearLiffAuth();
       localStorage.removeItem('dev_line_user_id');
+      // ปลดตัวกัน Auto-login 1 ครั้ง/Session ไม่งั้นการหมดอายุครั้งที่สองใน Session เดิมจะไม่ได้ login ใหม่ (Guard ตั้ง Flag ใหม่เองกัน Loop)
+      sessionStorage.removeItem('liff_auto_login_attempted');
       if (typeof window !== 'undefined' && window.location.pathname !== '/liff') {
         window.location.href = `/liff?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
       }
