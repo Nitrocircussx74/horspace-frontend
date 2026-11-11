@@ -119,6 +119,22 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// API บอกว่า LINE ID Token เสียด้วย 2 code (tenantAuthService ใช้ LINE_TOKEN_INVALID, liffAuthMiddleware ใช้ TOKEN_INVALID)
+const LINE_TOKEN_INVALID_CODES = ['LINE_TOKEN_INVALID', 'TOKEN_INVALID'];
+const isLineTokenInvalid = (err) => LINE_TOKEN_INVALID_CODES.includes(err?.response?.data?.code);
+
+// กู้คืนเมื่อ LINE ID Token เสีย: ล้าง session แล้วพากลับ /liff เพื่อ login LINE ใหม่ (ใช้ร่วมกันทั้งตอน API ปฏิเสธ
+// token และตอน silent-login เองล้มเหลวด้วยสาเหตุนี้) ถ้าอยู่ /liff อยู่แล้วไม่ redirect ซ้ำ กัน Loop
+const recoverFromInvalidLineToken = () => {
+  useAuthStore().clearLiffAuth();
+  localStorage.removeItem('dev_line_user_id');
+  // ปลดตัวกัน Auto-login 1 ครั้ง/Session ไม่งั้นการหมดอายุครั้งที่สองใน Session เดิมจะไม่ได้ login ใหม่ (Guard ตั้ง Flag ใหม่เองกัน Loop)
+  sessionStorage.removeItem('liff_auto_login_attempted');
+  if (typeof window !== 'undefined' && window.location.pathname !== '/liff') {
+    window.location.href = `/liff?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+  }
+};
+
 // ==========================================
 // 4. Response Interceptor (Dual Silent Refresh)
 // ==========================================
@@ -146,15 +162,8 @@ api.interceptors.response.use(
     // เพื่อบังคับให้ liff.init() รันใหม่ทั้งหมด (Route Change ธรรมดาผ่าน router.push ไม่ช่วย เพราะ
     // Singleton ใน liff.js จะไม่ re-init ให้) เช็คก่อน isAuthEndpoint เพราะ Endpoint ที่คืน Code นี้
     // (pin-login, link-and-login, check-status, silent-login) ล้วนมี /auth/ อยู่ในพาธที่จะโดน Skip ไป
-    if (isLiffRoute && error.response?.data?.code === 'LINE_TOKEN_INVALID') {
-      const authStore = useAuthStore();
-      authStore.clearLiffAuth();
-      localStorage.removeItem('dev_line_user_id');
-      // ปลดตัวกัน Auto-login 1 ครั้ง/Session ไม่งั้นการหมดอายุครั้งที่สองใน Session เดิมจะไม่ได้ login ใหม่ (Guard ตั้ง Flag ใหม่เองกัน Loop)
-      sessionStorage.removeItem('liff_auto_login_attempted');
-      if (typeof window !== 'undefined' && window.location.pathname !== '/liff') {
-        window.location.href = `/liff?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-      }
+    if (isLiffRoute && isLineTokenInvalid(error)) {
+      recoverFromInvalidLineToken();
       return Promise.reject(error);
     }
 
@@ -234,9 +243,14 @@ api.interceptors.response.use(
         // [FALLBACK / EDGE CASE]: ต่ออายุไม่สำเร็จ (เช่น เปลี่ยน LINE Account หรือสิทธิ์หลุด)
         processLiffQueue(refreshError, null);
 
-        const authStore = useAuthStore();
-        authStore.clearLiffAuth();
-        localStorage.removeItem('dev_line_user_id');
+        if (isLineTokenInvalid(refreshError)) {
+          // silent-login ถูกเรียกด้วย axios ตรงๆ (ไม่ผ่าน interceptor นี้) CASE 0 ด้านบนจึงไม่เคยเห็น error ของมัน
+          recoverFromInvalidLineToken();
+        } else {
+          const authStore = useAuthStore();
+          authStore.clearLiffAuth();
+          localStorage.removeItem('dev_line_user_id');
+        }
 
         return Promise.reject(refreshError);
       } finally {
