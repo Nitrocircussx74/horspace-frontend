@@ -740,6 +740,7 @@
               <img
                 v-if="tenantProfile.avatarUrl"
                 :src="tenantProfile.avatarUrl"
+                :alt="`${tenantProfile.firstName} ${tenantProfile.lastName}`"
                 class="w-8 h-8 rounded-full object-cover border border-white shadow-2xs shrink-0"
               />
               <div v-else class="w-8 h-8 rounded-full bg-teal-100 text-teal-700 font-bold text-xs flex items-center justify-center shrink-0">
@@ -772,6 +773,7 @@
                 <img
                   v-if="mate.linePictureUrl"
                   :src="mate.linePictureUrl"
+                  :alt="mate.name || `${mate.firstName} ${mate.lastName}`"
                   class="w-8 h-8 rounded-full object-cover border border-slate-100 shadow-2xs shrink-0"
                 />
                 <div v-else class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center shrink-0">

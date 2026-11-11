@@ -170,7 +170,7 @@
               </div>
 
               <div v-if="previewUrl" class="text-center">
-                <img :src="previewUrl" class="h-40 mx-auto object-cover rounded-xl border border-slate-100 shadow-xs" />
+                <img :src="previewUrl" alt="ตัวอย่างสลิปโอนเงินที่อัปโหลด" class="h-40 mx-auto object-cover rounded-xl border border-slate-100 shadow-xs" />
               </div>
 
               <Button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600" :disabled="submitting || !selectedFile">
