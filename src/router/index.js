@@ -13,12 +13,6 @@ const routes = [
     component: () => import('@/views/LoginView.vue'),
     meta: { isCms: true }
   },
-  {
-    path: '/web/login',
-    name: 'WebLogin',
-    component: () => import('@/views/WebLogin.vue'),
-    meta: { isTenantWeb: true, title: 'เข้าสู่ระบบลูกบ้าน (Web Portal)' }
-  },
   // หมายเหตุ: เดิมมี /pin-login, /setup-pin, /change-pin แบบ Top-level ซ้ำกับชุดใต้ /liff/*
   // แต่ใช้ Component เดียวกันทุกอย่างและไม่มีที่ไหนในแอปลิงก์มาเลย - ตัดออกเหลือชุดเดียวใต้ /liff/*
   // ที่มี LiffLayout ห่ออยู่ (ดูด้านล่างในหมวด LINE / LIFF Tenant Portal Routes)
@@ -384,28 +378,13 @@ async function cmsNavigationGuard(to, from, next) {
   next();
 }
 
-/**
- * true = Route นี้เป็นของ Web Tenant (ลูกบ้านที่ไม่ใช้ LINE เลย) ต้องข้าม Guard ที่บังคับเปิด LINE App
- * เดิมเช็คแค่ to.path === '/web/login' — พอ Login สำเร็จแล้ว redirect ไป /liff/invoices ซึ่งไม่มี
- * meta.isTenantWeb เลย ทำให้โดน Guard ด้านล่างเด้งไปเปิด LINE ทันทีหลัง Login (ทั้งที่ตั้งใจให้ไม่ต้องใช้ LINE)
- * จึงต้องเช็คด้วยว่ามี Session แบบ Web Tenant อยู่แล้วหรือไม่ (In-memory หรือ localStorage ตอน Refresh หน้าตรงๆ)
- * แยกเป็นฟังก์ชันเพื่อเทสต์ได้โดยไม่ต้อง Mock LINE SDK ทั้งก้อน
- */
-export function isWebTenantNavigation(to, authStore) {
-  if (to.path === '/web/login' || to.meta?.isTenantWeb) return true;
-  if (authStore?.isWebTenant) return true;
-  return typeof window !== 'undefined' && Boolean(window.localStorage?.getItem('horspace_tenant_token'));
-}
-
 async function liffNavigationGuard(to, from, next) {
   const authStore = useAuthStore();
 
   // 📱 0. หากเปิดผ่าน Browser ธรรมดา (ไม่ใช่ LINE App จริง) ให้เด้งไปเปิดผ่าน LINE แทนทันที
   // กัน User สับสน/ติดปัญหา LINE ID Token verify ไม่ได้แบบที่เจอกันมา (LIFF ต้องพึ่ง Session จริงของ LINE
-  // เสมอ Browser ธรรมดาไม่มีทางได้ Token จริง) — ข้ามใน Dev Mode ไว้ให้ยังทดสอบผ่าน Browser ด้วย
-  // ?devLineUserId= ได้ตามปกติ, ข้าม Web Tenant ทุกหน้า (ไม่ใช่แค่ /web/login) เพราะตั้งใจออกแบบให้ใช้นอก LINE ได้อยู่แล้ว
-  const isWebLoginRoute = isWebTenantNavigation(to, authStore);
-  if (!import.meta.env.DEV && !isWebLoginRoute && typeof window !== 'undefined') {
+  // เสมอ Browser ธรรมดาไม่มีทางได้ Token จริง) — ข้ามใน Dev Mode ไว้ให้ยังทดสอบผ่าน Browser ด้วย ?devLineUserId= ได้ตามปกติ
+  if (!import.meta.env.DEV && typeof window !== 'undefined') {
     await initLiff();
     if (!isInLiffClient()) {
       const liffId = import.meta.env.VITE_LINE_LIFF_ID || import.meta.env.VITE_LIFF_ID || '';
@@ -420,7 +399,7 @@ async function liffNavigationGuard(to, from, next) {
   // LiffEntryView.vue ที่เช็ค พอเข้าหน้าอื่นตรง ๆ ด้วย Deep Link เช่น /liff/onboarding, /liff/register เลยไม่มี
   // LINE ID Token ให้ Backend ตรวจ แล้วโดน 401 "กรุณาเข้าสู่ระบบผ่าน LINE ก่อนใช้งาน" — ย้ายมาเช็ครวมที่นี่ที่
   // เดียวแทน ครอบคลุมทุก Route ที่ผ่าน Guard นี้) จำกัด 1 ครั้งต่อ Session กัน Loop เหมือนเดิม
-  if (!isWebLoginRoute && typeof window !== 'undefined' && !isLiffLoggedIn()) {
+  if (typeof window !== 'undefined' && !isLiffLoggedIn()) {
     const loginAttempted = sessionStorage.getItem('liff_auto_login_attempted');
     if (!loginAttempted) {
       sessionStorage.setItem('liff_auto_login_attempted', 'true');
@@ -471,16 +450,7 @@ async function liffNavigationGuard(to, from, next) {
     }
   }
 
-  // 🌐 หากเป็นหน้า Web Login สำหรับลูกบ้าน
-  if (to.path === '/web/login' || to.meta.isTenantWeb) {
-    const hasSession = authStore.liffToken || (await authStore.restoreLiffSession());
-    if (hasSession && !to.query.force) {
-      return next({ path: to.query.redirect || '/liff/invoices' });
-    }
-    return next();
-  }
-
-  // ⚡ Fast-track: หากผู้ใช้เคยล็อกอินอยู่แล้ว (Memory หรือกู้คืนผ่าน Silent Login ด้วย LINE ID Token / Web Tenant)
+  // ⚡ Fast-track: หากผู้ใช้เคยล็อกอินอยู่แล้ว (Memory หรือกู้คืนผ่าน Silent Login ด้วย LINE ID Token)
   // เมื่อเข้าหน้า /liff ให้ตรงไปหน้าแรกทันทีโดยไม่ต้องผ่านหน้าโหลด
   if (to.path === '/liff' || to.path === '/liff/') {
     const hasSession = authStore.liffToken || (await authStore.restoreLiffSession());
@@ -498,7 +468,6 @@ async function liffNavigationGuard(to, from, next) {
   if (to.meta?.requiresLiffAuth) {
     const hasSession = authStore.liffToken || (await authStore.restoreLiffSession());
     if (!hasSession) {
-      // ตรวจสอบว่าเปิดจากภายนอกที่ไม่ใช่ LINE หรือไม่ ถ้าใช่ให้ส่งไป /web/login
       return next({ path: '/liff', query: { redirect: to.fullPath } });
     }
   }
@@ -507,7 +476,7 @@ async function liffNavigationGuard(to, from, next) {
 }
 
 router.beforeEach(async (to, from, next) => {
-  if (to.path.startsWith('/liff') || to.meta.isLiff || to.path === '/web/login' || to.meta.isTenantWeb) {
+  if (to.path.startsWith('/liff') || to.meta.isLiff) {
     return liffNavigationGuard(to, from, next);
   } else {
     return cmsNavigationGuard(to, from, next);

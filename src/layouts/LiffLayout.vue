@@ -40,19 +40,8 @@
 
         <!-- Right: Badge & Actions -->
         <div class="flex items-center justify-end gap-2">
-          <Badge v-if="authStore.isWebTenant" variant="neutral" class="bg-cyan-50 text-cyan-700 border border-cyan-200">Web Portal</Badge>
-          <Badge v-else variant="success">LIFF</Badge>
+          <Badge variant="success">LIFF</Badge>
           <NotificationBell v-if="showBottomNav" mode="tenant" />
-          <Button
-            v-if="authStore.isWebTenant"
-            variant="ghost"
-            size="sm"
-            class="text-slate-500 hover:text-rose-600"
-            title="ออกจากระบบลูกบ้าน"
-            @click="handleLogout"
-          >
-            ออก
-          </Button>
         </div>
       </div>
     </header>
@@ -180,8 +169,8 @@ import { useAuthStore } from '@/stores/auth';
 import { useFeatureStore } from '@/stores/useFeatureStore';
 import { useDynamicTheme } from '@/composables/useDynamicTheme';
 import { useAnnouncements } from '@/composables/useAnnouncements';
-import { initLiff, getLiffFriendship, openAddFriendLine, isLiffLoggedIn, closeLiffWindow } from '@/utils/liff';
-import { showSuccess, showWarning, showConfirm } from '@/utils/swal';
+import { initLiff, getLiffFriendship, openAddFriendLine, isLiffLoggedIn } from '@/utils/liff';
+import { showSuccess, showWarning } from '@/utils/swal';
 import NotificationBell from '@/components/NotificationBell.vue';
 import {
   ChevronLeft,
@@ -360,25 +349,6 @@ const handleRecheckFriendship = async () => {
     console.warn('Recheck friendship error:', err);
   } finally {
     checkingFriendship.value = false;
-  }
-};
-
-const handleLogout = async () => {
-  const isConfirmed = await showConfirm(
-    'ยืนยันออกจากระบบ',
-    'คุณต้องการออกจากระบบลูกบ้านใช่หรือไม่?',
-    'ออกจากระบบ',
-    'ยกเลิก'
-  );
-  if (!isConfirmed) return;
-
-  const result = await authStore.logoutTenant();
-  if (result.channel === 'web') {
-    router.replace('/web/login');
-  } else if (result.channel === 'line_client') {
-    closeLiffWindow();
-  } else {
-    router.replace('/liff');
   }
 };
 

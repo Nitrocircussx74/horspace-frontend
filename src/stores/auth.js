@@ -14,7 +14,6 @@ export const useAuthStore = defineStore('auth', {
     liffToken: null,
     isLiffReady: false,
     liffProfile: null,
-    isWebTenant: false,
     loading: false,
 
     // ห้อง/ตึกที่ลูกบ้านเลือกอยู่ใน LIFF (Mirror ลง localStorage ให้ api.js แนบเป็น X-Room-Id / X-Building-Id)
@@ -103,20 +102,6 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    setTenantWebAuth(token, tenantData = null) {
-      this.liffToken = token;
-      this.isWebTenant = true;
-      if (tenantData) {
-        this.tenant = tenantData;
-      }
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('horspace_tenant_token', token);
-        if (tenantData) {
-          localStorage.setItem('horspace_tenant_data', JSON.stringify(tenantData));
-        }
-      }
-    },
-
     setTenant(tenantData) {
       this.tenant = tenantData;
     },
@@ -124,12 +109,9 @@ export const useAuthStore = defineStore('auth', {
     clearLiffAuth() {
       this.tenant = null;
       this.liffToken = null;
-      this.isWebTenant = false;
       this.setActiveRoom(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('liff_token');
-        localStorage.removeItem('horspace_tenant_token');
-        localStorage.removeItem('horspace_tenant_data');
       }
     },
 
@@ -156,23 +138,7 @@ export const useAuthStore = defineStore('auth', {
     async restoreLiffSession() {
       if (this.liffToken) return true;
 
-      // 1. ตรวจสอบ Web Tenant Session ใน LocalStorage ก่อน
-      if (typeof window !== 'undefined') {
-        const storedTenantToken = localStorage.getItem('horspace_tenant_token');
-        const storedTenantData = localStorage.getItem('horspace_tenant_data');
-        if (storedTenantToken) {
-          this.liffToken = storedTenantToken;
-          this.isWebTenant = true;
-          if (storedTenantData) {
-            try {
-              this.tenant = JSON.parse(storedTenantData);
-            } catch {}
-          }
-          return true;
-        }
-      }
-
-      // 2. ถ้าไม่มี Web Tenant ให้ลองกู้คืนผ่าน LINE LIFF Silent Login
+      // กู้คืนผ่าน LINE LIFF Silent Login
       try {
         await initLiff();
         if (!isLiffLoggedIn()) return false;
@@ -324,53 +290,34 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Action สำหรับตั้งรหัสผ่านใหม่
-     */
-    async setupPassword(newPassword, oldPassword = '') {
-      this.loading = true;
-      try {
-        const data = await authService.setupPassword({ newPassword, oldPassword });
-        return data;
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    /**
-     * Action ออกจากระบบสำหรับลูกบ้าน (Tenant Logout)
-     * แยก Channel ชัดเจน: ถ้าเข้าผ่าน Web Portal จะจบเซสชันเว็บแล้วพาไป /web/login
-     * ถ้าเข้าผ่าน LINE LIFF จะปิดหน้าต่าง LINE App หรือ logout LINE session
+     * Action ออกจากระบบสำหรับลูกบ้าน (Tenant Logout ผ่าน LINE LIFF)
+     * ปิดหน้าต่าง LINE App หรือ logout LINE session
      */
     async logoutTenant() {
       this.loading = true;
-      const wasWebTenant = this.isWebTenant;
       try {
         this.clearLiffAuth();
         if (typeof window !== 'undefined') {
           localStorage.removeItem('dev_line_user_id');
         }
 
-        if (wasWebTenant) {
-          return { channel: 'web', redirect: '/web/login' };
-        } else {
-          try {
-            const liff = (await import('@line/liff')).default;
-            if (typeof liff.isInClient === 'function' && liff.isInClient()) {
-              if (typeof liff.closeWindow === 'function') {
-                liff.closeWindow();
-              }
-              return { channel: 'line_client', closed: true };
-            } else if (typeof liff.isLoggedIn === 'function' && liff.isLoggedIn()) {
-              if (typeof liff.logout === 'function') {
-                liff.logout();
-              }
-              return { channel: 'line_external', redirect: '/liff' };
+        try {
+          const liff = (await import('@line/liff')).default;
+          if (typeof liff.isInClient === 'function' && liff.isInClient()) {
+            if (typeof liff.closeWindow === 'function') {
+              liff.closeWindow();
             }
-          } catch (liffErr) {
-            console.warn('LIFF logout warning:', liffErr);
+            return { channel: 'line_client', closed: true };
+          } else if (typeof liff.isLoggedIn === 'function' && liff.isLoggedIn()) {
+            if (typeof liff.logout === 'function') {
+              liff.logout();
+            }
+            return { channel: 'line_external', redirect: '/liff' };
           }
-          return { channel: 'line', redirect: '/liff' };
+        } catch (liffErr) {
+          console.warn('LIFF logout warning:', liffErr);
         }
+        return { channel: 'line', redirect: '/liff' };
       } finally {
         this.loading = false;
       }

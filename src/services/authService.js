@@ -23,18 +23,6 @@ export const authService = {
   },
 
   /**
-   * เข้าสู่ระบบสำหรับลูกบ้านผ่าน Web Browser ปกติ (Dual-Mode Login ไม่ผ่าน LINE)
-   * @param {Object} credentials - { phoneNumber: string, pin: string }
-   */
-  async loginWeb(credentials) {
-    const response = await api.post('/api/auth/web/login', {
-      phone_number: credentials.phone || credentials.phoneNumber || credentials.phone_number,
-      pin: credentials.pin
-    });
-    return response.data; // { success: true, accessToken, user, tenant }
-  },
-
-  /**
    * เข้าสู่ระบบด้วยเบอร์โทรศัพท์และรหัสผ่าน (Local Password)
    * @param {Object} credentials - { phoneNumber: string, password: string }
    */
@@ -106,15 +94,6 @@ export const authService = {
    */
   async changePin(payload) {
     const response = await api.post('/api/liff/profile/change-pin', payload);
-    return response.data; // { success: true, message }
-  },
-
-  /**
-   * ตั้งค่ารหัสผ่านใหม่หรือเปลี่ยนรหัสผ่าน
-   * @param {Object} payload - { newPassword: string, oldPassword?: string }
-   */
-  async setupPassword(payload) {
-    const response = await api.post('/api/auth/setup-password', payload);
     return response.data; // { success: true, message }
   },
 
