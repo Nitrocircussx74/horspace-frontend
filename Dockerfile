@@ -11,6 +11,12 @@ WORKDIR /app
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# เหตุผลเดียวกับ VITE_API_BASE_URL ข้างบน — ไม่รับผ่าน build arg ตัวนี้ Vite build จะได้ liffId
+# ว่าง แล้ว src/utils/liff.js จะไม่เรียก liff.init() เลย (เข้า Standalone Dev Mode เงียบๆ) ทำให้
+# ผู้เช่าจริงที่เปิดผ่าน LINE app ไม่มี LINE ID Token ส่งไป backend เลย
+ARG VITE_LINE_LIFF_ID
+ENV VITE_LINE_LIFF_ID=$VITE_LINE_LIFF_ID
+
 # คัดลอกไฟล์จัดการความสัมพันธ์ Dependencies
 COPY package.json yarn.lock ./
 
