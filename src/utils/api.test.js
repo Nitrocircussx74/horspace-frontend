@@ -63,6 +63,35 @@ describe('api response interceptor: 401 ในหน้า LIFF', () => {
     expect(sessionStorage.getItem('liff_auto_login_attempted')).toBeNull();
   });
 
+  it('TOKEN_INVALID (code จาก liffAuthMiddleware) ต้องกู้คืนเหมือน LINE_TOKEN_INVALID', async () => {
+    vi.stubGlobal('localStorage', { removeItem: vi.fn(), getItem: vi.fn(() => null), setItem: vi.fn() });
+    window.history.pushState({}, '', '/liff');
+    sessionStorage.setItem('liff_auto_login_attempted', 'true');
+    api.defaults.adapter = async (config) => {
+      const response = { data: { code: 'TOKEN_INVALID' }, status: 401, config, headers: {} };
+      throw Object.assign(new Error('401'), { config, response, isAxiosError: true });
+    };
+
+    await api.post('/api/v1/liff/register/invite', {}).catch(() => {});
+
+    expect(sessionStorage.getItem('liff_auto_login_attempted')).toBeNull();
+  });
+
+  it('silent-login ล้มเหลวด้วย LINE_TOKEN_INVALID ต้องกู้คืน (ไม่ผ่าน interceptor จึงต้องเช็คใน catch)', async () => {
+    vi.stubGlobal('localStorage', { removeItem: vi.fn(), getItem: vi.fn(() => null), setItem: vi.fn() });
+    window.history.pushState({}, '', '/liff');
+    sessionStorage.setItem('liff_auto_login_attempted', 'true');
+    api.defaults.adapter = async (config) => {
+      const response = { data: { code: 'TOKEN_EXPIRED' }, status: 401, config, headers: {} };
+      throw Object.assign(new Error('401'), { config, response, isAxiosError: true });
+    };
+    axios.post.mockRejectedValue(Object.assign(new Error('401'), { response: { status: 401, data: { code: 'LINE_TOKEN_INVALID' } } }));
+
+    await api.get('/api/v1/invoices').catch(() => {});
+
+    expect(sessionStorage.getItem('liff_auto_login_attempted')).toBeNull();
+  });
+
   it('นอกหน้า LIFF ยังใช้ CMS refresh และเด้งไป /login เมื่อ refresh ล้มเหลว', async () => {
     window.history.pushState({}, '', '/rooms');
     axios.post.mockRejectedValue(new Error('no cookie'));
