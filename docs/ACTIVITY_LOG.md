@@ -343,3 +343,15 @@
   - **วิธีเช็คที่เชื่อถือได้ที่สุด**: `docker inspect <image>:latest --format "{{.Config.Env}}"` เช็คว่า ENV ฝังเข้า image จริงไหม (ก่อน grep JS หรือเปิด browser เช็คเลย) — ตัดปัญหา browser/LINE in-app cache ออกไปได้ทั้งหมด
 - **สร้างคู่มือ deploy แยกเป็น Artifact** (ไม่ได้เก็บในโค้ด) สรุป: ภาพรวม infra, ขั้นตอน deploy ปกติ (แรก vs ครั้งต่อไปแยก backend/frontend), ตาราง pitfall ทั้งหมดข้างต้น, checklist verify, คำสั่งดู log — ลิงก์อยู่ที่ที่ผู้ใช้ขอให้สร้างในแชท ไม่ใช่ไฟล์ใน repo
 - **Status**: 🟢 แก้แล้ว ยืนยันด้วย `docker inspect` + `curl` grep entry chunk หลัก เจอค่าจริง — รอผู้ใช้ทดสอบ flow LIFF จริงผ่าน LINE app ยืนยันปิดเคสสุดท้าย
+
+---
+
+### Phase 28 (2026-11-11): 401 ในหน้า `/liff` เด้งไป CMS login + `activeBuildingId` ขยะ + flow ID Token หมดอายุ
+
+- **อาการ 1**: เปิด `/liff` แล้วถูกพาไปหน้า login ของ CMS
+- **Root cause 1 (วิเคราะห์จากโค้ด ยังไม่ได้ลองซ้ำใน LINE จริง)**: [api.js](file:///Users/user/Desktop/playgroud/playground/playground-frontend/src/utils/api.js) response interceptor ตัดสินว่า request เป็น LIFF จาก URL (`/api/v1/liff`, `/api/liff`) เท่านั้น แต่ `LiffOwnerDashboardView` เรียก `/api/v1/invoices`, `/maintenance-requests`, `/buildings` → 401 ตกสาขา CMS → `/auth/refresh` ล้มเหลว (ไม่มี cookie) → `router.push('/login')`
+- **แก้ (PR #36 `fix/liff-401-no-cms-redirect`)**: นับเป็น LIFF เมื่อ `window.location.pathname` ขึ้นต้น `/liff` ด้วย → 401 ไป silent-login ด้วย LINE ID Token แล้ว retry; ตอน `LINE_TOKEN_INVALID` ล้าง `sessionStorage.liff_auto_login_attempted` (เดิม auto-login ได้แค่ครั้งเดียวต่อ session); guard `/liff` กู้ session เงียบแล้วกลับหน้าเดิมตาม `?redirect=` เฉพาะ path ที่ขึ้นต้น `/liff/` (กัน open redirect) — test: `src/utils/api.test.js` (3 ข้อ; ข้อ redirect ใน guard ยังไม่มี test เพราะ guard ไม่ได้ export)
+- **อาการ 2**: `GET /rooms?buildingId=<ข้อความไทย>` พัง P2023 ฝั่ง API — [useBuildingStore.js](file:///Users/user/Desktop/playgroud/playground/playground-frontend/src/stores/useBuildingStore.js) อ่าน `localStorage.activeBuildingId` ตรงๆ โดยไม่ตรวจ แก้ให้ใช้เฉพาะค่าที่เป็น UUID (PR #35 `fix/active-building-id-uuid`) ยังไม่พบว่าค่าไทยเข้า localStorage ได้อย่างไร
+- **ข้อเท็จจริงที่ควรจำ**: ใน vitest env ของโปรเจกต์นี้ **ไม่มี `localStorage`** (ต้อง `vi.stubGlobal` ใน test ที่โค้ดเรียกมัน); LINE ID Token อายุ 1 ชม. ไม่ต่ออายุเอง (ข้อเสนอเช็ก `exp` ใน `getLiffIdToken()` ถูกยกเลิก เพราะเป็น getter แบบ sync ที่ถูกเรียกหลายที่ ห้ามมี side effect/redirect) — ยังไม่ทำ pre-check ตอนกลับมาที่หน้า (YAGNI รอมีผู้ใช้เจอจริง)
+- **Dev**: รัน `yarn dev` (5173) + `cloudflared tunnel run horspace-dev` (`~/.cloudflared/config.yml`: `dev.horspace.com`→5173, `dev-api.horspace.com`→3000); โหมด DEV ถ้าไม่มี ID Token จริง `LiffEntryView` จะส่ง `localStorage.dev_line_user_id` เป็น `lineIdToken` ซึ่งใช้ได้เฉพาะเมื่อ API เปิด `LINE_AUTH_MOCK_MODE=true` (ห้ามเปิดค้างขณะเปิด tunnel สาธารณะ)
+- **Status**: 🟡 PR #35, #36 เปิดแล้ว รอ merge + deploy + ทดสอบจริงใน LINE (เปิด `/liff` ด้วยบัญชี owner หลัง token หมดอายุ ต้องไม่เด้งไป CMS)

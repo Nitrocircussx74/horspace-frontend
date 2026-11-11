@@ -185,6 +185,7 @@ yarn dev
 yarn dev:tunnel
 # หมายเหตุ: หลังแก้ vite.config.js หรือ Restart แล้ว Hash ของ Vite เปลี่ยน ถ้าเปิดผ่าน Tunnel แล้วเจอ Pinia error ให้ล้าง Site Data ของโดเมนหนึ่งครั้ง (Safari/iOS ไม่รองรับ Clear-Site-Data)
 # หมายเหตุ: ถ้าเข้า /liff ผ่าน Tunnel แล้วโดน LINE เด้ง error400 "invalid url" — Endpoint URL ของ LIFF app ใน LINE Developers Console ไม่ตรงกับ hostname tunnel ปัจจุบัน ต้องแก้ใน Console เอง (ดู docs/ACTIVITY_LOG.md Phase 26)
+# หมายเหตุ: 401 ในหน้า /liff ไม่ควรเด้งไป CMS login อีก (api.js นับหน้า /liff เป็น LIFF) และถ้า LINE ID Token หมดอายุ (อายุ 1 ชม.) ระบบจะ login ใหม่แล้วกลับหน้าเดิม (ดู docs/ACTIVITY_LOG.md Phase 28)
 
 # 5. ตรวจสอบการ Build สำหรับ Production
 yarn build
