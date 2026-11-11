@@ -364,10 +364,15 @@ const onVisible = () => {
   if (document.visibilityState === 'visible') refreshFeatures();
 };
 
+// เช็คเฉพาะตอน Login แล้วจริงๆ กัน 401 Noise จาก Silent LINE Login ที่ยังไม่มี Token (เช่นหน้ายังโหลดไม่เสร็จ)
+const checkUnreadIfAuthed = () => {
+  if (authStore.liffToken) checkUnread();
+};
+
 watch(
   () => route.path,
   () => {
-    checkUnread();
+    checkUnreadIfAuthed();
     refreshFeatures();
   }
 );
@@ -380,7 +385,7 @@ onMounted(async () => {
   await featureStore.fetchFeatures(bId);
   document.addEventListener('visibilitychange', onVisible);
   checkUserFriendship();
-  checkUnread();
+  checkUnreadIfAuthed();
 });
 </script>
 

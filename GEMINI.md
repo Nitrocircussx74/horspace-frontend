@@ -46,3 +46,4 @@
 ## ⚠️ ข้อควรระวัง Dev Tunnel
 
 - Cloudflare Tunnel แคชไฟล์ `.js` ใต้ `/src` ฝั่ง Browser 4 ชม. จนเกิด Pinia 2 สำเนา (`getActivePinia()` ไม่มี) — แก้แล้วด้วย Plugin `dev-src-no-store` ใน `vite.config.js` รายละเอียดใน [AGENTS.md](file:///Users/user/Desktop/playgroud/playground/playground-frontend/AGENTS.md) และ Phase 24 ของ [docs/ACTIVITY_LOG.md](file:///Users/user/Desktop/playgroud/playground/playground-frontend/docs/ACTIVITY_LOG.md)
+- `VITE_LINE_LIFF_ID` เครื่อง dev ใช้ร่วมกับ production — ถ้า Endpoint URL ของ LIFF app นี้ใน LINE Developers Console ไม่ตรงกับ hostname tunnel ปัจจุบัน (`dev.horspace.com/liff`) จะเจอ `access.line.me/oauth2/v2.1/error400` ทันที แก้ได้แค่ผ่าน Console เอง (Login บัญชีผู้ใช้) ดู Phase 26 ของ [docs/ACTIVITY_LOG.md](file:///Users/user/Desktop/playgroud/playground/playground-frontend/docs/ACTIVITY_LOG.md)

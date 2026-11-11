@@ -316,3 +316,30 @@
 - **Dev Tunnel hostname ชนกับ production**: `scripts/dev-tunnel.js` + `~/.cloudflared/config.yml` เดิมใช้ `app.horspace.com`/`api.horspace.com` ชี้เข้า Cloudflare Named Tunnel สำหรับทดสอบ LINE LIFF ตอน dev — ตอนนี้ `api.horspace.com` ถูกใช้เป็น A record ของ production droplet ไปแล้ว ชนกันเต็มๆ แก้โดยเปลี่ยนชื่อ dev tunnel เป็น `dev.horspace.com`/`dev-api.horspace.com` ทั้งใน `config.yml` และรัน `cloudflared tunnel route dns horspace-dev <hostname>` สร้าง CNAME ใหม่ให้ครบ — `app.horspace.com` เดิมอาจมี DNS record ค้างอยู่ใน Cloudflare dashboard ที่ไม่ได้ใช้แล้ว ยังไม่ได้ลบ
 - **Status**: 🟢 Live ที่ `https://horspace.com`, login + silent refresh ทำงานถูกต้องแล้วหลังแก้ build arg
 - **ยังไม่เสร็จ**: ลบ DNS record เก่า (`app.horspace.com` CNAME) ใน Cloudflare dashboard ถ้ายังค้างอยู่ ดู `playground-api/docs/ACTIVITY_LOG.md` Phase 24 สำหรับงานค้างฝั่ง infra ที่เหลือ (UFW, backup cron, monitoring)
+
+---
+
+### Phase 26 (2026-11-11): วินิจฉัย LINE OAuth 400 "invalid url" ตอนเข้า `/liff` ผ่าน Dev Tunnel
+
+- **อาการ**: เข้า `https://dev.horspace.com/liff` แล้วถูก redirect ไปหน้า LINE แล้วเจอ `access.line.me/oauth2/v2.1/error400?error=Bad%20Request&error_description=invalid%20url.%20channelId%3D2011289517%2CredirectUriString%3Dhttps%3A%2F%2Fdev.horspace.com%2Fliff`
+- **Root Cause**: LINE ตรวจ `redirect_uri` (URL หน้าปัจจุบันตอน `liff.init()` ยิง OAuth) กับ **Endpoint URL** ที่ตั้งไว้ในหน้า LIFF app ของ LINE Developers Console เสมอ — `.env` เครื่อง dev ใช้ `VITE_LINE_LIFF_ID=2011289517-SB8YziXL` ซึ่งเป็น **LIFF ID ตัวเดียวกับ production** (channel `2011289517`) แต่ Endpoint URL ที่ Console เคยตั้งไว้คือ hostname เก่า (`app.horspace.com` ก่อนเปลี่ยนชื่อ tunnel ใน Phase 25 หรือ `horspace.com` จริงของ production) — ไม่เคยอัปเดตตามตอนย้าย dev tunnel ไปเป็น `dev.horspace.com` เลย จึงชนกันทุกครั้งที่เปิด dev ผ่าน tunnel
+- **ยืนยันไม่ได้ฝั่ง Agent**: การแก้ Endpoint URL ต้อง Login เข้า LINE Developers Console ด้วยบัญชีผู้ใช้เอง — Agent เข้าไปเช็ค/แก้ให้ไม่ได้ ต้องให้ผู้ใช้ทำเอง
+- **ทางแก้ที่เสนอ (ยังไม่ได้ทำ)**:
+  1. แก้ Endpoint URL ของ LIFF app `2011289517-SB8YziXL` ใน Console ให้ตรง `https://dev.horspace.com/liff` ทุกครั้งที่สลับ dev ↔ production (เสี่ยงลืมสลับกลับ)
+  2. **(แนะนำ)** สร้าง LIFF app ใหม่แยกสำหรับ dev โดยเฉพาะ (Channel/LIFF ID คนละตัวกับ production) แล้วตั้ง `VITE_LINE_LIFF_ID` แยกใน `.env` เครื่อง dev — ไม่ต้องแก้ Endpoint URL ของ production LIFF ไปมาอีก
+- **Status**: 🔴 รอผู้ใช้ตัดสินใจทางแก้ + เข้า Console เอง — ยังไม่ปิดงาน
+
+---
+
+### Phase 27 (2026-11-11): `VITE_LINE_LIFF_ID` Build Arg Incident — ผู้เช่าทุกคนที่เปิดผ่าน LINE จริงเจอ UNAUTHORIZED
+
+- **บริบท**: ผู้ใช้รายงาน error `UNAUTHORIZED` "กรุณาเข้าสู่ระบบผ่าน LINE ก่อนใช้งาน (ไม่พบ LINE ID Token)" ตอนเปิด LIFF ผ่าน production จริง — รูปแบบปัญหาเดียวกับ `VITE_API_BASE_URL` ใน Phase 25 เป๊ะ แต่เป็นอีกตัวแปรที่ไม่เคยถูกเอาเข้า build chain เลยตั้งแต่แรก (เส้นแยกจากปัญหา dev tunnel ของ Phase 26 ข้างบน — คนละอาการ คนละสาเหตุ บังเอิญแตะตัวแปรเดียวกัน)
+- **Root cause**: `src/utils/liff.js` (`initLiff()`) อ่าน `import.meta.env.VITE_LINE_LIFF_ID` — ถ้าว่างจะ**ไม่เรียก `liff.init()` เลย** (เข้า "Standalone Dev Mode" เงียบๆ พร้อม `console.warn`) ทำให้ `getLiffIdToken()` คืน `null` ตลอด ไม่มี header `X-Line-Id-Token` ส่งไป backend เลยสักครั้ง — ตัวแปรนี้ไม่เคยอยู่ใน `Dockerfile` (มีแค่ `ARG VITE_API_BASE_URL`) และไม่เคยอยู่ใน `.env.production.example`/`.env.staging.example`/`.env.local.example` ที่ root มาตั้งแต่ Phase 25 เลย (ตกหล่นตอนทำ fix ตัวแรก ไม่ใช่ regression)
+- **แก้**: เพิ่ม `ARG VITE_LINE_LIFF_ID` + `ENV VITE_LINE_LIFF_ID=$VITE_LINE_LIFF_ID` ใน `Dockerfile` (รูปแบบเดียวกับ `VITE_API_BASE_URL`), เพิ่ม `VITE_LINE_LIFF_ID: ${VITE_LINE_LIFF_ID}` ใน `docker-compose.yml` ที่ root ใต้ `frontend.build.args`, เพิ่ม placeholder ใน 3 ไฟล์ `.env.*.example` ที่ root
+- **สิ่งที่เรียนรู้จากการ debug รอบนี้ (ใช้ได้กับทุก Vite env var ในอนาคต)**:
+  - **False positive จาก grep เจอค่าใน JS bundle**: เช็ครอบแรกด้วย `docker exec ... grep "<LIFF ID>" assets/*.js` เจอค่าจริงใน `BuildingSettingsView-xxx.js` แล้วเข้าใจผิดว่า build ถูกต้องแล้ว — ที่จริงคือ `placeholder="เช่น 2011289517-SB8YziXL"` ใน [BuildingSettingsView.vue:876](file:///Users/user/Desktop/playgroud/playground/playground-frontend/src/views/BuildingSettingsView.vue#L876) (ตัวอย่างฟอร์มกรอก LIFF ID รายตึก ไม่เกี่ยวกับ env varตัวนี้เลย) บังเอิญเลขตรงกัน — **วิธีเช็คที่ถูกต้อง**: grep เฉพาะ **entry chunk หลัก** (ไฟล์ที่ `index.html` ชี้ `src=` ตรงๆ ผ่าน `curl https://horspace.com/ | grep -oE 'src="[^"]*\.js"'`) ไม่ใช่ chunk ไหนก็ได้ที่เจอค่า
+  - **`docker compose build` เสร็จเร็วผิดปกติ (1.7s) = cache hit ไม่ได้ build จริง** — สาเหตุคือ `Dockerfile` แก้ไว้ local แล้วแต่ยัง**ไม่ commit/push** ขึ้น GitHub เลย droplet `git pull` ไปแล้วไม่ได้อะไรใหม่ (`docker-compose.yml`/`Caddyfile` ที่ root ไม่อยู่ใน git repo ไหนเลย ต้องแก้มือบน droplet เองเสมอ แยกจาก repo `playground-frontend`/`playground-api`)
+  - **แก้ `docker-compose.yml` บน droplet ด้วย `nano` แล้ว YAML พัง** (`go-yaml load error ... did not find expected key`) — บรรทัด `container_name` ที่ตามหลังบรรทัดที่เพิ่งพิมพ์ใหม่ indent เหลือ 1 space จากที่ควรเป็น 4 (เพี้ยนจาก auto-indent ของ `nano`) แก้ด้วย `sed -i` เจาะจงบรรทัด แล้วเช็ค `docker compose config > /dev/null && echo "YAML OK"` ก่อน build ทุกครั้งที่แก้ไฟล์นี้
+  - **วิธีเช็คที่เชื่อถือได้ที่สุด**: `docker inspect <image>:latest --format "{{.Config.Env}}"` เช็คว่า ENV ฝังเข้า image จริงไหม (ก่อน grep JS หรือเปิด browser เช็คเลย) — ตัดปัญหา browser/LINE in-app cache ออกไปได้ทั้งหมด
+- **สร้างคู่มือ deploy แยกเป็น Artifact** (ไม่ได้เก็บในโค้ด) สรุป: ภาพรวม infra, ขั้นตอน deploy ปกติ (แรก vs ครั้งต่อไปแยก backend/frontend), ตาราง pitfall ทั้งหมดข้างต้น, checklist verify, คำสั่งดู log — ลิงก์อยู่ที่ที่ผู้ใช้ขอให้สร้างในแชท ไม่ใช่ไฟล์ใน repo
+- **Status**: 🟢 แก้แล้ว ยืนยันด้วย `docker inspect` + `curl` grep entry chunk หลัก เจอค่าจริง — รอผู้ใช้ทดสอบ flow LIFF จริงผ่าน LINE app ยืนยันปิดเคสสุดท้าย
