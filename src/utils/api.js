@@ -185,23 +185,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isLiffRefreshing = true;
 
-      // ผู้เช่าเว็บ (เข้าด้วยเบอร์+PIN ไม่ผ่าน LINE) ไม่มี LINE ID Token ให้ Silent Login — ต่ออายุด้วย Refresh Token Cookie แทน
-      const wasWebTenant = useAuthStore().isWebTenant;
-
       try {
-        if (wasWebTenant) {
-          const refreshRes = await axios.post(`${cleanBaseUrl}/auth/refresh`, {}, { withCredentials: true });
-          const refreshedToken = refreshRes.data?.accessToken;
-          if (!refreshedToken) {
-            throw new Error('ไม่ได้รับ Access Token ใหม่จากการต่ออายุเซสชัน');
-          }
-
-          useAuthStore().setTenantWebAuth(refreshedToken);
-          originalRequest.headers.Authorization = `Bearer ${refreshedToken}`;
-          processLiffQueue(null, refreshedToken);
-          return api(originalRequest);
-        }
-
         await initLiff();
         const idToken = getLiffIdToken();
 
@@ -248,11 +232,6 @@ api.interceptors.response.use(
         const authStore = useAuthStore();
         authStore.clearLiffAuth();
         localStorage.removeItem('dev_line_user_id');
-
-        // ผู้เช่าเว็บที่ต่ออายุไม่ได้ (Refresh Token หมดอายุ/ถูกเพิกถอน) ให้กลับไปหน้าเข้าสู่ระบบ
-        if (wasWebTenant && typeof window !== 'undefined' && window.location.pathname !== '/web/login') {
-          router.push({ path: '/web/login', query: { redirect: window.location.pathname + window.location.search } });
-        }
 
         return Promise.reject(refreshError);
       } finally {

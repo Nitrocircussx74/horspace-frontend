@@ -320,9 +320,7 @@ const handleTenantLogout = async () => {
     const result = await authStore.logoutTenant();
     await showSuccess('ออกจากระบบสำเร็จ', 'ลบข้อมูลการเข้าใช้งานเรียบร้อยแล้ว');
 
-    if (result.channel === 'web') {
-      router.replace('/web/login');
-    } else if (result.channel === 'line_client') {
+    if (result.channel === 'line_client') {
       const { closeLiffWindow } = await import('@/utils/liff');
       closeLiffWindow();
     } else {
@@ -330,7 +328,7 @@ const handleTenantLogout = async () => {
     }
   } catch (err) {
     console.error('Tenant logout error:', err);
-    router.replace(authStore.isWebTenant ? '/web/login' : '/liff');
+    router.replace('/liff');
   }
 };
 
