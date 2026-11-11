@@ -620,6 +620,8 @@ const handleForgotPin = async () => {
 
 const handleLineLogin = async () => {
   isLoggingIn.value = true;
+  // ล้าง guard ก่อนเพื่อให้ onMounted หลัง redirect กลับมายังเรียก loginLiff ได้อีกครั้งถ้าต้องการ
+  sessionStorage.removeItem('liff_auto_login_attempted');
   try {
     const liffId = import.meta.env.VITE_LINE_LIFF_ID || import.meta.env.VITE_LIFF_ID || '';
     if (liffId) {

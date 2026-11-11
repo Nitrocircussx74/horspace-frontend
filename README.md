@@ -197,4 +197,6 @@ Live ที่ `https://horspace.com` — รันบน DigitalOcean Droplet �
 
 **สำคัญ**: `VITE_API_BASE_URL` ต้องส่งผ่าน Docker build arg เสมอ (ดู `Dockerfile` + `docker-compose.yml build.args`) ห้ามพึ่งไฟล์ `.env` เพราะ `.dockerignore` กันไฟล์นี้ไม่ให้เข้า build context — ลืมตั้งจะ fallback เป็น `localhost:3000` เงียบๆ โดยไม่มี error ทำให้ frontend ที่ deploy จริงยิง API ผิดที่
 
-รายละเอียดเต็ม ดู `docs/ACTIVITY_LOG.md` Phase 25
+**เหมือนกันสำหรับ `VITE_LINE_LIFF_ID`**: ต้องส่งผ่าน build arg เสมอด้วย (เพิ่มแล้วใน `Dockerfile`/`docker-compose.yml`) ไม่งั้น `liff.init()` จะไม่ถูกเรียกเลยบน production จริง ผู้เช่าทุกคนที่เปิดผ่าน LINE จะโดน `401 UNAUTHORIZED` ตลอด — เช็คให้แน่ใจว่าค่าฝังเข้า build จริงด้วย `docker inspect <image> --format "{{.Config.Env}}"` ก่อนเชื่อผล
+
+รายละเอียดเต็ม ดู `docs/ACTIVITY_LOG.md` Phase 25 (VITE_API_BASE_URL) และ Phase 27 (VITE_LINE_LIFF_ID)
