@@ -133,7 +133,10 @@ api.interceptors.response.use(
     }
 
     const url = originalRequest.url || '';
-    const isLiffRoute = url.includes('/api/v1/liff') || url.includes('/api/liff');
+    // หน้า LIFF (เช่น owner-dashboard) เรียก Endpoint ฝั่ง CMS ที่ path ไม่มีคำว่า liff (/invoices, /buildings ฯลฯ)
+    // ถ้าดูแค่ URL จะหลุดไปสาขา CMS แล้วเด้งไปหน้า /login ของ CMS — จึงนับว่าเป็น LIFF เมื่ออยู่ในหน้า /liff ด้วย
+    const isLiffPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/liff');
+    const isLiffRoute = isLiffPage || url.includes('/api/v1/liff') || url.includes('/api/liff');
     const isAuthEndpoint = url.includes('/auth/') || url.includes('/invites/verify') || url.includes('/silent-login');
     const isCmsAuthRoute = url.includes('/auth/login') || url.includes('/auth/refresh');
 
