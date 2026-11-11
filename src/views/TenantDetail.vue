@@ -164,7 +164,7 @@
               <!-- LINE Linking Action for Non-LINE / Walk-in Tenants -->
               <div v-if="!tenant.lineUserId" class="pt-2 flex flex-wrap items-center gap-2">
                 <Button
-                  @click="openLineLinkModal"
+                  @click="lineLinkModalRef?.open()"
                   size="sm"
                   class="bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/30 active:scale-95"
                 >
@@ -231,402 +231,31 @@
 
         <!-- TAB 1: ภาพรวม & สัญญาเช่า (Overview & Leases) -->
         <TabsContent value="overview">
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left 2 Cols: Tenancy History & Rooms -->
-            <div class="lg:col-span-2 space-y-6">
-              <Card class="p-6 space-y-4">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Home class="w-4 h-4" />
-                      <span>ประวัติการอยู่อาศัย & สัญญาเช่า (Lease History)</span>
-                    </h3>
-                    <p class="text-xs text-slate-500">
-                      แสดงรายการห้องพักที่เคยเช่าตั้งแต่วันเริ่มต้นสัญญาจนถึงปัจจุบัน
-                    </p>
-                  </div>
-                  <span class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                    ทั้งหมด {{ tenant.leaseContracts?.length || 0 }} สัญญา
-                  </span>
-                </div>
-
-                <!-- Empty Leases List -->
-                <div v-if="!tenant.leaseContracts || tenant.leaseContracts.length === 0" class="p-8 text-center bg-slate-50 rounded-xl border border-slate-200/60 text-slate-400 space-y-1">
-                  <div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto text-slate-400 mb-2"><FileText class="w-6 h-6" /></div>
-                  <div class="text-xs font-bold text-slate-600">ยังไม่มีบันทึกสัญญาเช่า</div>
-                  <p class="text-xs">ผู้เช่าคนนี้ยังไม่มีประวัติเปิดสัญญาเช่าอย่างเป็นทางการในระบบ</p>
-                </div>
-
-                <!-- Leases Timeline List -->
-                <div v-else class="space-y-4">
-                  <div
-                    v-for="lease in tenant.leaseContracts"
-                    :key="lease.id"
-                    class="p-5 rounded-xl border transition-all space-y-3"
-                    :class="lease.status === 'ACTIVE' ? 'bg-cyan-50/40 border-cyan-200 shadow-2xs' : 'bg-slate-50/60 border-slate-200'"
-                  >
-                    <!-- Lease Item Header -->
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <div class="flex items-center gap-2.5">
-                        <div
-                          class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-2xs"
-                          :class="lease.status === 'ACTIVE' ? 'bg-cyan-600 text-white' : 'bg-slate-200 text-slate-700'"
-                        >
-                          <Home class="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div class="text-sm font-bold text-slate-900">
-                            {{ lease.building?.name || lease.room?.building?.name || 'อาคาร' }} - ห้อง {{ lease.room?.roomNumber || '-' }}
-                          </div>
-                          <div class="text-xs text-slate-500">
-                            ชั้น {{ lease.room?.floor || '-' }} • ค่าเช่า {{ formatCurrency(lease.room?.price) }}/เดือน
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- Lease Status Badge -->
-                      <Badge :variant="lease.status === 'ACTIVE' ? 'success' : lease.status === 'CANCELLED' ? 'danger' : 'neutral'">
-                        {{ lease.status === 'ACTIVE' ? 'กำลังพักอาศัย' : lease.status === 'ENDED' ? 'ย้ายออกแล้ว' : 'ยกเลิกสัญญา' }}
-                      </Badge>
-                    </div>
-
-                    <!-- Dates & Deposit Info -->
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-white p-3 rounded-xl border border-slate-200/80 text-xs">
-                      <div>
-                        <span class="text-slate-400 block text-xs">วันเริ่มสัญญา:</span>
-                        <span class="font-bold text-slate-800">{{ formatDate(lease.startDate) }}</span>
-                      </div>
-
-                      <div>
-                        <span class="text-slate-400 block text-xs">วันสิ้นสุดสัญญา:</span>
-                        <span class="font-bold text-slate-800">
-                          {{ lease.actualEndDate ? formatDate(lease.actualEndDate) : formatDate(lease.expectedEndDate) }}
-                          <span v-if="lease.status === 'ACTIVE'" class="text-cyan-600 font-normal"> (ปัจจุบัน)</span>
-                        </span>
-                      </div>
-
-                      <div class="col-span-2 sm:col-span-1">
-                        <span class="text-slate-400 block text-xs">เงินประกัน/มัดจำ:</span>
-                        <span class="font-bold text-cyan-700">{{ formatCurrency(lease.depositAmount) }}</span>
-                      </div>
-                    </div>
-
-                    <!-- Move Out Reason & Record Details if present -->
-                    <div v-if="lease.moveOutReason || lease.moveOutRecord" class="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs space-y-1 text-amber-900">
-                      <div v-if="lease.moveOutReason" class="font-medium">
-                        <span class="font-bold">เหตุผลที่ย้ายออก:</span> {{ lease.moveOutReason }}
-                      </div>
-
-                      <div v-if="lease.moveOutRecord" class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-amber-200/60 text-xs">
-                        <span>ยอดคืนมัดจำสุทธิ: <strong>{{ formatCurrency(lease.moveOutRecord.netRefund) }}</strong></span>
-                        <span class="px-2 py-0.5 rounded-md bg-amber-200/60 font-bold">
-                          สถานะคืนเงิน: {{ lease.moveOutRecord.refundStatus === 'PAID' ? 'ชำระคืนเรียบร้อย' : 'รอคืนเงิน' }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            <!-- Right 1 Col: Internal Notes Box (RBAC Controlled for OWNER / MANAGER) -->
-            <div class="space-y-6">
-              <Card class="p-6 space-y-4">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Lock class="w-4 h-4" />
-                    <span>บันทึกภายใน (Internal Notes)</span>
-                  </h3>
-                  <span
-                    class="text-xs font-extrabold px-2.5 py-1 rounded-md uppercase"
-                    :class="canManageNotes ? 'bg-cyan-100 text-cyan-800' : 'bg-slate-100 text-slate-500'"
-                  >
-                    {{ canManageNotes ? 'OWNER / MANAGER ONLY' : 'READ ONLY' }}
-                  </span>
-                </div>
-
-                <p class="text-xs text-slate-500">
-                  บันทึกพฤติกรรม ข้อสังเกต หรือสัญลักษณ์แจ้งเตือนเฉพาะกลุ่มผู้บริหารและแอดมิน (ลูกบ้านจะไม่เห็นข้อมูลนี้)
-                </p>
-
-                <!-- Blacklist Flag Checkbox Toggle -->
-                <div
-                  class="p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3"
-                  :class="notesForm.isBlacklisted ? 'bg-rose-50 border-rose-300' : 'bg-slate-50 border-slate-200'"
-                >
-                  <div class="flex items-center gap-2.5">
-                    <input
-                      id="blacklist-toggle"
-                      type="checkbox"
-                      v-model="notesForm.isBlacklisted"
-                      :disabled="!canManageNotes || savingNotes"
-                      class="w-4 h-4 text-rose-600 rounded-md border-slate-300 focus:ring-rose-500 cursor-pointer disabled:cursor-not-allowed"
-                    />
-                    <label for="blacklist-toggle" class="text-xs font-bold text-slate-800 cursor-pointer select-none">
-                      กำหนดสถานะ Blacklist (ติดแบล็กลิสต์)
-                    </label>
-                  </div>
-                  <span v-if="notesForm.isBlacklisted" class="text-xs font-extrabold text-rose-600 bg-rose-100 px-2 py-0.5 rounded-md">
-                    ความเสี่ยงสูง
-                  </span>
-                </div>
-
-                <!-- Textarea Internal Notes -->
-                <div class="space-y-1.5">
-                  <label for="tenant-internal-notes" class="text-xs font-bold text-slate-700">ข้อความบันทึกภายในเพิ่มเติม:</label>
-                  <textarea
-                    id="tenant-internal-notes"
-                    v-model="notesForm.internalNotes"
-                    rows="6"
-                    :disabled="!canManageNotes || savingNotes"
-                    placeholder="พิมพ์บันทึกภายใน เช่น จ่ายค่าเช่าตรงเวลา, มักขอผ่อนผันค่าน้ำไฟ, มีเสียงดังรบกวนห้องข้างเคียง..."
-                    class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 disabled:bg-slate-100 disabled:text-slate-500"
-                  ></textarea>
-                </div>
-
-                <!-- Action Save Button for Authorized Admin -->
-                <Button v-if="canManageNotes" class="w-full" :disabled="savingNotes" @click="saveInternalNotes">
-                  <span v-if="savingNotes" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  <span>{{ savingNotes ? 'กำลังบันทึก...' : 'บันทึกข้อมูลภายใน' }}</span>
-                </Button>
-
-                <!-- Restricted Access Alert Notice -->
-                <div v-else class="p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-center gap-2">
-                  <span>ℹ️</span>
-                  <span>คุณมีสิทธิ์อ่านเท่านั้น (เฉพาะ Role OWNER หรือ MANAGER ที่แก้ไขได้)</span>
-                </div>
-              </Card>
-            </div>
-          </div>
+          <TenantOverviewTab
+            :tenant="tenant"
+            :can-manage-notes="canManageNotes"
+            @notes-saved="handleNotesSaved"
+          />
         </TabsContent>
 
         <!-- TAB 2: ประวัติการชำระเงิน (Billing Behavior) -->
         <TabsContent value="billing">
-          <div class="space-y-6">
-            <!-- Header Summary Metrics Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <!-- Metric 1: Total Paid Amount -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">ยอดรวมที่เคยจ่าย</div>
-                <div class="text-xl sm:text-2xl font-extrabold text-emerald-600">{{ formatCurrency(totalPaidAmount) }}</div>
-                <div class="text-xs text-slate-400">จากบิลที่ชำระเรียบร้อยแล้ว</div>
-              </Card>
-
-              <!-- Metric 2: Late Payments Count -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">จำนวนครั้งที่จ่ายช้า</div>
-                <div class="text-xl sm:text-2xl font-extrabold" :class="latePaymentsCount > 0 ? 'text-rose-600' : 'text-slate-800'">
-                  {{ latePaymentsCount }} ครั้ง
-                </div>
-                <div class="text-xs text-slate-400">จ่ายหลังวันครบกำหนด หรือค้างชำระ</div>
-              </Card>
-
-              <!-- Metric 3: Total Invoices -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">จำนวนบิลทั้งหมด</div>
-                <div class="text-xl sm:text-2xl font-extrabold text-cyan-700">{{ tenant.invoices?.length || 0 }} ใบ</div>
-                <div class="text-xs text-slate-400">ประวัติออกบิลย้อนหลัง</div>
-              </Card>
-
-              <!-- Metric 4: Outstanding Balance -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">ยอดค้างชำระปัจจุบัน</div>
-                <div class="text-xl sm:text-2xl font-extrabold" :class="outstandingBalance > 0 ? 'text-amber-600' : 'text-slate-800'">
-                  {{ formatCurrency(outstandingBalance) }}
-                </div>
-                <div class="text-xs text-slate-400">สถานะ Pending หรือ Overdue</div>
-              </Card>
-            </div>
-
-            <!-- Invoices History Table Card -->
-            <Card class="p-0 overflow-hidden">
-              <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Receipt class="w-4 h-4" />
-                    <span>ตารางประวัติใบแจ้งหนี้และการชำระเงิน (Invoice Log)</span>
-                  </h3>
-                  <p class="text-xs text-slate-500">
-                    เรียงตามรอบบิลล่าสุดและแสดงสถานะความตรงต่อเวลาของการชำระเงิน
-                  </p>
-                </div>
-              </div>
-
-              <!-- Empty Invoices Table -->
-              <div v-if="!tenant.invoices || tenant.invoices.length === 0" class="p-12 text-center text-slate-400 space-y-2">
-                <div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto text-slate-400 mb-2"><Receipt class="w-6 h-6" /></div>
-                <div class="text-xs font-bold text-slate-600">ยังไม่มีประวัติใบแจ้งหนี้</div>
-                <p class="text-xs">ไม่พบบิลค่าเช่าของผู้เช่ารายนี้ในระบบ</p>
-              </div>
-
-              <!-- Invoices Table -->
-              <div v-else class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-slate-700">
-                  <thead class="bg-slate-50 border-b border-slate-200/80 text-xs font-bold text-slate-500 uppercase">
-                    <tr>
-                      <th class="py-3.5 px-4">เลขที่บิล</th>
-                      <th class="py-3.5 px-4">รอบบิล</th>
-                      <th class="py-3.5 px-4">ห้องพัก</th>
-                      <th class="py-3.5 px-4">ยอดสุทธิ</th>
-                      <th class="py-3.5 px-4">วันครบกำหนด</th>
-                      <th class="py-3.5 px-4">วันที่ชำระ</th>
-                      <th class="py-3.5 px-4 text-center">สถานะ</th>
-                      <th class="py-3.5 px-4 text-right">พฤติกรรมชำระ</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    <tr v-for="inv in tenant.invoices" :key="inv.id" class="hover:bg-slate-50/80 transition-colors">
-                      <td class="py-3.5 px-4 font-mono font-bold text-cyan-700">{{ inv.invoiceNumber }}</td>
-                      <td class="py-3.5 px-4 font-medium">{{ inv.billingCycle }}</td>
-                      <td class="py-3.5 px-4 font-semibold">ห้อง {{ inv.room?.roomNumber || '-' }}</td>
-                      <td class="py-3.5 px-4 font-extrabold text-slate-900">{{ formatCurrency(inv.grandTotal) }}</td>
-                      <td class="py-3.5 px-4 text-slate-500 font-mono">{{ formatDate(inv.dueDate) }}</td>
-                      <td class="py-3.5 px-4 font-mono">
-                        {{ inv.paidAt ? formatDate(inv.paidAt) : '-' }}
-                      </td>
-                      <td class="py-3.5 px-4 text-center">
-                        <Badge :variant="inv.status === 'paid' ? 'success' : inv.status === 'pending' ? 'warning' : 'danger'">
-                          {{ inv.status === 'paid' ? 'ชำระแล้ว' : inv.status === 'pending' ? 'รอชำระ' : 'เกินกำหนด' }}
-                        </Badge>
-                      </td>
-                      <td class="py-3.5 px-4 text-right">
-                        <span v-if="getInvoicePaymentBehavior(inv).isLate" class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-xs font-bold">
-                          จ่ายช้า {{ getInvoicePaymentBehavior(inv).daysLate }} วัน
-                        </span>
-                        <span v-else-if="inv.status === 'paid'" class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                          ตรงเวลา
-                        </span>
-                        <span v-else class="text-slate-400 text-xs italic">
-                          -
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
+          <TenantBillingTab
+            :tenant="tenant"
+            :total-paid-amount="totalPaidAmount"
+            :outstanding-balance="outstandingBalance"
+            :late-payments-count="latePaymentsCount"
+          />
         </TabsContent>
 
         <!-- TAB 3: ประวัติแจ้งซ่อม (Maintenance Log) -->
         <TabsContent value="maintenance">
-          <div class="space-y-6">
-            <!-- Summary Metrics Header -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <!-- Metric 1: Total Maintenance Requests -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">แจ้งซ่อมทั้งหมด</div>
-                <div class="text-xl sm:text-2xl font-extrabold text-slate-900">{{ tenant.maintenanceRequests?.length || 0 }} ครั้ง</div>
-                <div class="text-xs text-slate-400">ประวัติขอรับบริการซ่อม</div>
-              </Card>
-
-              <!-- Metric 2: Resolved Requests -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">ซ่อมเสร็จสิ้น</div>
-                <div class="text-xl sm:text-2xl font-extrabold text-emerald-600">{{ resolvedMaintenanceCount }} รายการ</div>
-                <div class="text-xs text-slate-400">สถานะ Resolved</div>
-              </Card>
-
-              <!-- Metric 3: In Progress / Pending -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">กำลังดำเนินการ</div>
-                <div class="text-xl sm:text-2xl font-extrabold text-amber-600">{{ pendingMaintenanceCount }} รายการ</div>
-                <div class="text-xs text-slate-400">รอดำเนินการหรือกำลังซ่อม</div>
-              </Card>
-
-              <!-- Metric 4: Total Repair Cost -->
-              <Card class="p-5 space-y-1">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">ค่าซ่อมแซมรวม</div>
-                <div class="text-xl sm:text-2xl font-extrabold text-cyan-700">{{ formatCurrency(totalRepairCost) }}</div>
-                <div class="text-xs text-slate-400">รวมทุกรายการแจ้งซ่อม</div>
-              </Card>
-            </div>
-
-            <!-- Maintenance Request Log Cards / List -->
-            <Card class="p-6 space-y-4">
-              <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div>
-                  <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Wrench class="w-4 h-4" />
-                    <span>บันทึกการแจ้งซ่อมแซมสิ่งอำนวยความสะดวก (Maintenance Log)</span>
-                  </h3>
-                  <p class="text-xs text-slate-500">
-                    แสดงข้อมูลการใช้งานห้องและประวัติเรียกช่างซ่อมบำรุง
-                  </p>
-                </div>
-              </div>
-
-              <!-- Empty State -->
-              <div v-if="!tenant.maintenanceRequests || tenant.maintenanceRequests.length === 0" class="p-12 text-center text-slate-400 space-y-2">
-                <div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto text-slate-400 mb-2"><Wrench class="w-6 h-6" /></div>
-                <div class="text-xs font-bold text-slate-600">ยังไม่มีรายการแจ้งซ่อม</div>
-                <p class="text-xs">ผู้เช่าคนนี้ไม่เคยส่งคำขอแจ้งซ่อมแซมสิ่งของในห้องพัก</p>
-              </div>
-
-              <!-- Maintenance Log Items -->
-              <div v-else class="space-y-4">
-                <div
-                  v-for="req in tenant.maintenanceRequests"
-                  :key="req.id"
-                  class="p-5 rounded-xl border bg-slate-50/70 border-slate-200 hover:border-cyan-300 transition-all space-y-3"
-                >
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="space-y-1">
-                      <div class="flex items-center gap-2">
-                        <span class="text-base font-bold text-slate-900">{{ req.title }}</span>
-                        <span class="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                          ห้อง {{ req.room?.roomNumber || '-' }}
-                        </span>
-                      </div>
-                      <p class="text-xs text-slate-600 leading-relaxed">{{ req.description }}</p>
-                    </div>
-
-                    <!-- Status Badge -->
-                    <Badge :variant="req.status === 'resolved' ? 'success' : req.status === 'cancelled' ? 'neutral' : 'warning'">
-                      {{
-                        req.status === 'pending' ? 'รอดำเนินการ' :
-                        req.status === 'in_progress' ? 'กำลังซ่อม' :
-                        req.status === 'resolved' ? 'ซ่อมเสร็จสิ้น' : 'ยกเลิก'
-                      }}
-                    </Badge>
-                  </div>
-
-                  <!-- Details Grid -->
-                  <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-200/80 text-xs">
-                    <div>
-                      <span class="text-slate-400 block text-xs">ช่างผู้รับผิดชอบ:</span>
-                      <span class="font-bold text-slate-800">{{ req.technicianName || 'ยังไม่มอบหมาย' }}</span>
-                    </div>
-
-                    <div>
-                      <span class="text-slate-400 block text-xs">ค่าซ่อมแซม:</span>
-                      <span class="font-bold text-cyan-700">{{ formatCurrency(req.repairCost) }}</span>
-                    </div>
-
-                    <div v-if="Number(req.repairCost || 0) > 0">
-                      <span class="text-slate-400 block text-xs">ผู้รับผิดชอบค่าใช้จ่าย:</span>
-                      <span class="font-bold" :class="req.payer === 'TENANT' ? 'text-amber-700' : 'text-slate-800'">
-                        {{ req.payer === 'TENANT' ? 'ลูกบ้านจ่ายเอง' : 'นิติออกให้' }}
-                        <span v-if="req.payer === 'TENANT'" class="font-normal text-slate-400">
-                          ({{ req.billedInvoiceId ? 'รวมในบิลแล้ว' : 'รอรวมบิลรอบถัดไป' }})
-                        </span>
-                      </span>
-                    </div>
-
-                    <div>
-                      <span class="text-slate-400 block text-xs">วันที่แจ้ง:</span>
-                      <span class="font-mono text-slate-700">{{ formatDate(req.createdAt) }}</span>
-                    </div>
-                  </div>
-
-                  <!-- Admin Note if present -->
-                  <div v-if="req.adminNote" class="p-2.5 bg-cyan-50/60 border border-cyan-200/70 rounded-xl text-xs text-cyan-900">
-                    <span class="font-bold">บันทึกแอดมิน/ช่าง:</span> {{ req.adminNote }}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
+          <TenantMaintenanceTab
+            :tenant="tenant"
+            :resolved-maintenance-count="resolvedMaintenanceCount"
+            :pending-maintenance-count="pendingMaintenanceCount"
+            :total-repair-cost="totalRepairCost"
+          />
         </TabsContent>
 
         <!-- TAB 4: การเข้าถึงและความปลอดภัย (App Access & Security) -->
@@ -637,54 +266,7 @@
     </div>
 
     <!-- LINE Account Linking Modal for Existing Tenant -->
-    <Dialog :open="showLineLinkModal" @update:open="showLineLinkModal = $event">
-      <DialogContent class="max-w-md space-y-5">
-        <div class="text-center space-y-2">
-          <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-2xs">
-            <MessageSquare class="w-6 h-6" />
-          </div>
-          <h3 class="text-lg font-extrabold text-slate-900 tracking-tight">เชื่อมต่อบัญชี LINE ให้ผู้เช่า</h3>
-          <p class="text-xs text-slate-500">
-            ผู้เช่า: <span class="font-bold text-slate-800">{{ tenant?.firstName }} {{ tenant?.lastName }}</span>
-          </p>
-        </div>
-
-        <div v-if="loadingInvite" class="py-12 text-center text-slate-500 space-y-2">
-          <div class="animate-spin w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full mx-auto"></div>
-          <div class="text-xs">กำลังสร้างรหัสเชื่อมต่อ...</div>
-        </div>
-
-        <div v-else class="space-y-4">
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center space-y-2">
-            <div class="text-xs font-bold text-slate-500 uppercase">รหัสเชิญ 6 หลัก (Invite Code)</div>
-            <div class="text-3xl font-black font-mono tracking-widest text-emerald-600">
-              {{ generatedInviteCode }}
-            </div>
-            <div class="text-xs text-slate-400">
-              หมดอายุใน 7 วัน (ใช้คู่กับเบอร์โทรศัพท์ 4 ตัวท้าย: <span class="font-mono font-bold text-slate-700">{{ (tenant?.phone || '').slice(-4) }}</span>)
-            </div>
-          </div>
-
-          <div v-if="qrCodeDataUrl" class="text-center space-y-2">
-            <div class="text-xs font-bold text-slate-600">หรือให้ลูกบ้านสแกน QR Code เพื่อเปิด LINE LIFF:</div>
-            <img :src="qrCodeDataUrl" alt="LINE Onboarding QR" class="w-48 h-48 mx-auto rounded-xl border border-slate-200 shadow-xs" />
-          </div>
-
-          <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 space-y-1">
-            <div class="font-bold">วิธีการเชื่อมต่อสำหรับลูกบ้าน:</div>
-            <ol class="list-decimal pl-4 space-y-0.5 text-emerald-800">
-              <li>เปิด LINE ของหอพัก และเข้าเมนู "ผูกบัญชีลูกบ้าน"</li>
-              <li>กรอกรหัส 6 หลัก และเบอร์โทร 4 ตัวท้าย</li>
-              <li>ระบบจะเชื่อมข้อมูลห้องพักและบิลเข้า LINE ทันที</li>
-            </ol>
-          </div>
-
-          <Button class="w-full bg-slate-900 hover:bg-slate-800" @click="showLineLinkModal = false">
-            ปิดหน้าต่าง (Close)
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <LineAccountLinkModal ref="lineLinkModalRef" :tenant="tenant" :tenant-id="tenantId" />
   </div>
 </template>
 
@@ -701,24 +283,21 @@ import {
   Receipt,
   Wrench,
   ShieldCheck,
-  Home,
-  Lock,
   ArrowLeft
 } from 'lucide-vue-next';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import QRCode from 'qrcode';
-import { showSuccess, showError } from '@/utils/swal';
 import tenantService from '@/services/tenantService';
 import { useAuthStore } from '@/stores/auth';
 import { useBuildingStore } from '@/stores/useBuildingStore';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import TenantSecurityTab from '@/components/TenantSecurityTab.vue';
-import { formatShortDate as formatDate, formatCurrency } from '@/utils/formatters';
+import TenantOverviewTab from '@/components/tenant/TenantOverviewTab.vue';
+import TenantBillingTab from '@/components/tenant/TenantBillingTab.vue';
+import TenantMaintenanceTab from '@/components/tenant/TenantMaintenanceTab.vue';
+import LineAccountLinkModal from '@/components/tenant/LineAccountLinkModal.vue';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 const route = useRoute();
 const router = useRouter();
@@ -733,23 +312,18 @@ const handleSecurityUpdated = (updatedTenant) => {
   }
 };
 
+const handleNotesSaved = ({ internalNotes, isBlacklisted }) => {
+  if (tenant.value) {
+    tenant.value.internalNotes = internalNotes;
+    tenant.value.isBlacklisted = isBlacklisted;
+  }
+};
+
 const loading = ref(true);
 const error = ref(null);
 const tenant = ref(null);
 const activeTab = ref('overview');
-
-// LINE Account Linking State
-const showLineLinkModal = ref(false);
-const loadingInvite = ref(false);
-const generatedInviteCode = ref('');
-const qrCodeDataUrl = ref('');
-
-// Notes form state
-const savingNotes = ref(false);
-const notesForm = ref({
-  internalNotes: '',
-  isBlacklisted: false
-});
+const lineLinkModalRef = ref(null);
 
 // Check Security & RBAC permission for internal notes (OWNER / MANAGER / ADMIN)
 const userRole = computed(() => {
@@ -855,10 +429,6 @@ const loadTenantData = async () => {
     const res = await tenantService.getTenantDetail(tenantId.value, params);
     if (res.success && res.data) {
       tenant.value = res.data;
-      notesForm.value = {
-        internalNotes: res.data.internalNotes || '',
-        isBlacklisted: Boolean(res.data.isBlacklisted)
-      };
     } else {
       error.value = res.message || 'ไม่สามารถโหลดข้อมูลผู้เช่าได้';
     }
@@ -870,91 +440,11 @@ const loadTenantData = async () => {
   }
 };
 
-const saveInternalNotes = async () => {
-  if (!canManageNotes.value) {
-    showError('ไม่มีสิทธิ์ดำเนินการ', 'เฉพาะสิทธิ์ OWNER หรือ MANAGER เท่านั้นที่สามารถบันทึกได้');
-    return;
-  }
-
-  savingNotes.value = true;
-
-  try {
-    const res = await tenantService.updateTenantNotes(tenantId.value, {
-      internalNotes: notesForm.value.internalNotes,
-      isBlacklisted: notesForm.value.isBlacklisted
-    });
-
-    if (res.success) {
-      if (tenant.value) {
-        tenant.value.internalNotes = notesForm.value.internalNotes;
-        tenant.value.isBlacklisted = notesForm.value.isBlacklisted;
-      }
-
-      showSuccess('บันทึกสำเร็จ', 'อัปเดตบันทึกภายในและสถานะผู้เช่าเรียบร้อยแล้ว');
-    }
-  } catch (err) {
-    console.error('Failed to update internal notes:', err);
-    showError('บันทึกไม่สำเร็จ', err.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-  } finally {
-    savingNotes.value = false;
-  }
-};
-
 const goBack = () => {
   if (window.history.length > 1) {
     router.back();
   } else {
     router.push('/tenants');
-  }
-};
-
-const getInvoicePaymentBehavior = (inv) => {
-  if (!inv) return { isLate: false, daysLate: 0 };
-  if (inv.status === 'overdue') {
-    const due = new Date(inv.dueDate);
-    const now = new Date();
-    const diffTime = Math.max(0, now - due);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return { isLate: true, daysLate: diffDays };
-  }
-  if (inv.status === 'paid' && inv.paidAt && inv.dueDate) {
-    const paid = new Date(inv.paidAt);
-    const due = new Date(inv.dueDate);
-    if (paid > due) {
-      const diffTime = paid - due;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return { isLate: true, daysLate: diffDays };
-    }
-  }
-  return { isLate: false, daysLate: 0 };
-};
-
-const openLineLinkModal = async () => {
-  showLineLinkModal.value = true;
-  loadingInvite.value = true;
-  try {
-    const res = await tenantService.generateTenantInvite(tenantId.value);
-    if (res.success && res.data) {
-      generatedInviteCode.value = res.data.inviteCode;
-      // Generate QR Code containing LIFF Onboarding URL with prefilled code
-      // ต้องใช้ https://liff.line.me/{LIFF_ID}/... (ไม่ใช่ window.location.origin) มิฉะนั้นสแกนแล้วจะเปิดเป็นเว็บปกติ
-      // ไม่ใช่แอป LIFF ใน LINE — เหมือน pattern เดียวกับ router/index.js, utils/liff.js และ TenantSecurityTab.vue
-      const liffId = import.meta.env.VITE_LINE_LIFF_ID || import.meta.env.VITE_LIFF_ID || '';
-      const liffUrl = liffId
-        ? `https://liff.line.me/${liffId}/onboarding?code=${res.data.inviteCode}`
-        : `${window.location.origin}/liff/onboarding?code=${res.data.inviteCode}`;
-      qrCodeDataUrl.value = await QRCode.toDataURL(liffUrl, {
-        width: 300,
-        margin: 2,
-        color: { dark: '#065f46', light: '#ffffff' }
-      });
-    }
-  } catch (err) {
-    console.error('Failed to generate invite code for LINE linking:', err);
-    showError('เกิดข้อผิดพลาด', err.response?.data?.message || 'ไม่สามารถสร้างรหัสเชื่อมต่อ LINE ได้');
-    showLineLinkModal.value = false;
-  } finally {
-    loadingInvite.value = false;
   }
 };
 </script>
