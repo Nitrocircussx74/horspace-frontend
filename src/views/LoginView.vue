@@ -1,6 +1,5 @@
 <template>
   <div class="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden bg-slate-900 font-sans selection:bg-cyan-600 selection:text-white">
-    <h1 class="sr-only">Horspace CMS — เข้าสู่ระบบสำหรับผู้ดูแลระบบและเจ้าของหอพัก</h1>
     <!-- Ambient Glow Background Meshes -->
     <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
       <div class="absolute -top-40 -left-40 w-96 h-96 bg-cyan-600/30 rounded-full blur-[100px]"></div>
@@ -23,7 +22,7 @@
           </div>
 
           <div>
-            <CardTitle class="text-2xl font-extrabold tracking-tight text-white">
+            <CardTitle as="h1" class="text-2xl font-extrabold tracking-tight text-white">
               Horspace <span class="text-cyan-400 font-bold">CMS</span>
             </CardTitle>
             <p class="text-xs font-semibold text-cyan-400 tracking-wide mt-1">
