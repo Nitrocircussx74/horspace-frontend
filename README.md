@@ -184,6 +184,7 @@ yarn dev
 # 4. รันพร้อมเปิด Cloudflare Tunnel สำหรับทดสอบ LINE LIFF บนอุปกรณ์จริง
 yarn dev:tunnel
 # หมายเหตุ: หลังแก้ vite.config.js หรือ Restart แล้ว Hash ของ Vite เปลี่ยน ถ้าเปิดผ่าน Tunnel แล้วเจอ Pinia error ให้ล้าง Site Data ของโดเมนหนึ่งครั้ง (Safari/iOS ไม่รองรับ Clear-Site-Data)
+# หมายเหตุ: ถ้าเข้า /liff ผ่าน Tunnel แล้วโดน LINE เด้ง error400 "invalid url" — Endpoint URL ของ LIFF app ใน LINE Developers Console ไม่ตรงกับ hostname tunnel ปัจจุบัน ต้องแก้ใน Console เอง (ดู docs/ACTIVITY_LOG.md Phase 26)
 
 # 5. ตรวจสอบการ Build สำหรับ Production
 yarn build

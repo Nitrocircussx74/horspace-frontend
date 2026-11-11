@@ -104,79 +104,13 @@
 
         <!-- Cards Container (Scrollable) -->
         <div class="p-3.5 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
-          <Card
+          <MaintenanceTicketCard
             v-for="item in pendingList"
             :key="item.uniqueId"
-            @click="openDetailModal(item)"
-            class="p-4 hover:shadow-md hover:border-amber-400/80 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer space-y-3 group"
-          >
-            <!-- Card Top: Category Badge + Room Pill + Time -->
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <Badge :variant="getCategoryBadgeVariant(item.category)" class="font-bold">
-                  <component :is="getCategoryIcon(item.category)" class="w-3 h-3" />
-                  <span>{{ getCategoryLabel(item.category) }}</span>
-                </Badge>
-
-                <span class="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/80 font-mono flex items-center gap-1">
-                  <DoorClosed class="w-3 h-3 text-cyan-600" />
-                  <span>ห้อง {{ item.room?.roomNumber || '-' }}</span>
-                </span>
-              </div>
-
-              <span class="text-xs text-slate-400 font-medium whitespace-nowrap flex items-center gap-0.5">
-                <Clock class="w-3 h-3 text-slate-300" />
-                <span>{{ formatRelativeTime(item.createdAt) }}</span>
-              </span>
-            </div>
-
-            <!-- Title & Description -->
-            <div class="space-y-1">
-              <h4 class="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-cyan-600 transition-colors line-clamp-1">
-                {{ item.title }}
-              </h4>
-              <p class="text-xs text-slate-500 line-clamp-2 leading-relaxed whitespace-pre-line">
-                {{ item.description || 'ไม่มีรายละเอียดเพิ่มเติม' }}
-              </p>
-            </div>
-
-            <!-- Image Thumbnails -->
-            <div v-if="item.imageUrls && item.imageUrls.length > 0" class="flex items-center gap-1.5 overflow-x-auto pt-0.5">
-              <img
-                v-for="(img, idx) in item.imageUrls.slice(0, 3)"
-                :key="idx"
-                :src="resolveImageUrl(img)"
-                :alt="`รูปประกอบการแจ้งซ่อม ${idx + 1}`"
-                class="w-11 h-11 rounded-xl object-cover border border-slate-200/80 shrink-0 hover:opacity-90 shadow-2xs"
-              />
-              <span
-                v-if="item.imageUrls.length > 3"
-                class="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-600 flex items-center justify-center shrink-0"
-              >
-                +{{ item.imageUrls.length - 3 }}
-              </span>
-            </div>
-
-            <!-- Card Bottom Bar -->
-            <div class="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-              <div class="flex items-center gap-1.5 truncate max-w-[140px] text-slate-600">
-                <div class="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
-                  {{ getTenantAvatarInitial(item) }}
-                </div>
-                <span class="truncate font-medium text-slate-700 text-xs">{{ getTenantDisplayName(item) }}</span>
-              </div>
-
-              <Button
-                size="sm"
-                variant="outline"
-                class="text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
-                @click.stop="handleQuickStatusChange(item, 'in_progress')"
-              >
-                <Zap class="w-3 h-3" />
-                <span>กำลังทำ</span>
-              </Button>
-            </div>
-          </Card>
+            :item="item"
+            @open="openDetailModal(item)"
+            @quick-status="(status) => handleQuickStatusChange(item, status)"
+          />
 
           <!-- Empty State -->
           <Card v-if="pendingList.length === 0" class="p-8 text-center border-dashed border-slate-200/80 shadow-none bg-white/70 space-y-1.5 my-2">
